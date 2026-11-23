@@ -1,0 +1,308 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>말하는 세우봇 브리핑</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+KR:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+/* VOICE: 아침 사내방송 — 짧고 또렷하게, 사실 위주
+   IDEA: 공항 출발 안내 부스처럼, 진행자가 말하고 자막판이 따라 넘어감
+   PICTURE: 세우 컬러의 원형 로봇 진행자(입=이퀄라이저 막대) + 큰 자막판
+   COLOUR and TYPE: 세우 네이비 #0E2A47 · 오렌지 #E4761B · 흰 바탕 / IBM Plex Sans KR
+   LAYOUT: 상단 네이비 밴드(진행자+자막+컨트롤) → 섹션 카드 목록 → 연동 안내 */
+:root{color-scheme:light dark;--bg:light-dark(#ffffff,#0a1522);--ink:light-dark(#14202e,#e8eef5);--mut:light-dark(#5b6878,#9fb0c3);--navy:#0E2A47;--or:#E4761B;--line:light-dark(#e2e7ee,#1f3249);--card:light-dark(#ffffff,#0f1e30);--hi:light-dark(#fff4ea,#2a1f14)}
+:root[data-theme=light]{color-scheme:light}:root[data-theme=dark]{color-scheme:dark}
+*{box-sizing:border-box;min-width:0}
+body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.6 "IBM Plex Sans KR",system-ui,sans-serif;overflow-x:clip}
+.band{padding:clamp(24px,4vw,56px) max(5vw,16px)}
+.wrap{max-width:1120px;margin:0 auto}
+.top{background:var(--navy);color:#fff}
+.top h1{font-size:clamp(26px,4vw,40px);line-height:1.1;margin:0 0 6px;text-wrap:balance}
+.top .sub{color:#c4d2e2;margin:0 0 22px;font-size:15px}
+.stage{display:grid;grid-template-columns:240px minmax(0,1fr);gap:28px;align-items:center}
+.bot{width:240px;height:240px}
+.bot .bar{transform-origin:center;transform-box:fill-box;transform:scaleY(.25)}
+.talking .bar{animation:talk .42s ease-in-out infinite alternate}
+.talking .bar:nth-child(2){animation-delay:.09s}.talking .bar:nth-child(3){animation-delay:.18s}.talking .bar:nth-child(4){animation-delay:.05s}.talking .bar:nth-child(5){animation-delay:.14s}
+@keyframes talk{from{transform:scaleY(.2)}to{transform:scaleY(1)}}
+.eye{transform-origin:center;transform-box:fill-box;animation:blink 4.5s infinite}
+@keyframes blink{0%,95%,100%{transform:scaleY(1)}97%{transform:scaleY(.1)}}
+.talking .ant{animation:glow .8s infinite alternate}@keyframes glow{to{opacity:.35}}
+.cap{background:#fff;color:#14202e;border-radius:14px;padding:18px 22px;min-height:120px;box-shadow:0 10px 30px rgba(0,0,0,.25);position:relative}
+.cap::before{content:"";position:absolute;left:-10px;top:44px;border:10px solid transparent;border-right-color:#fff;border-left:0}
+.cap .sec{font-size:13px;color:var(--or);font-weight:700;margin-bottom:4px}
+.cap .line{font-size:clamp(18px,2.3vw,22px);font-weight:500;line-height:1.5;text-wrap:pretty}
+.ctl{display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin-top:16px}
+button,select{font:inherit;font-size:16px;min-height:44px;border-radius:10px;border:1px solid #33506f;background:#16385c;color:#fff;padding:0 16px;cursor:pointer}
+button.main{background:var(--or);border-color:var(--or);font-weight:700;min-width:120px}
+button:focus-visible,select:focus-visible,input:focus-visible{outline:3px solid #ffb877;outline-offset:2px}
+label.rate{display:flex;align-items:center;gap:8px;color:#c4d2e2;font-size:14px}
+input[type=range]{accent-color:var(--or);width:110px}
+.prog{height:4px;background:#24446a;border-radius:2px;margin-top:14px;overflow:hidden}.prog i{display:block;height:100%;width:0;background:var(--or);transition:width .3s}
+.note{font-size:13px;color:#9fb3c9;margin-top:10px}
+.flow{font-size:18px;line-height:1.7;margin:0 0 8px;max-width:70ch}
+.meta{font-size:13px;color:var(--mut);margin:0 0 24px}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,320px),1fr));gap:16px}
+.card{border:1px solid var(--line);border-radius:14px;padding:18px 20px;background:var(--card);transition:background .3s,border-color .3s}
+.card.now{background:var(--hi);border-color:var(--or)}
+.card h2{font-size:19px;margin:0 0 8px;display:flex;justify-content:space-between;gap:10px;align-items:center}
+.card h2 button{background:transparent;color:var(--or);border:1px solid var(--or);font-size:14px;min-height:36px;padding:0 12px;flex:none}
+.card p{margin:0 0 10px}
+.tag{display:inline-block;font-size:12px;font-weight:700;padding:1px 8px;border-radius:99px;background:#fde6d3;color:#9a4a0b;margin-left:6px;vertical-align:2px}
+.card ul{margin:0;padding:0;list-style:none;font-size:14px}
+.card li{padding:6px 0;border-top:1px dashed var(--line)}
+.card a{color:inherit}.card .d{color:var(--mut);white-space:nowrap}
+details{margin-top:28px;border:1px solid var(--line);border-radius:12px;padding:14px 18px}
+summary{cursor:pointer;font-weight:700}
+textarea{width:100%;min-height:200px;font:13px/1.5 ui-monospace,monospace;border:1px solid var(--line);border-radius:8px;padding:10px;background:var(--bg);color:var(--ink)}
+.row{display:flex;gap:10px;flex-wrap:wrap;margin-top:10px}.row button{background:var(--navy);border-color:var(--navy)}
+@media(max-width:700px){.stage{grid-template-columns:1fr;justify-items:center}.bot{width:170px;height:170px}.cap::before{display:none}.cap{width:100%}}
+@media(prefers-reduced-motion:reduce){.talking .bar,.eye,.talking .ant{animation:none}.talking .bar{transform:scaleY(.7)}}
+</style>
+</head>
+<body>
+<header class="top band"><div class="wrap">
+  <h1 id="title">말하는 세우봇 — 아침 뉴스 브리핑</h1>
+  <p class="sub" id="sub">듣기를 누르면 오늘의 흐름과 섹터 요약을 읽어 드립니다.</p>
+  <div class="stage">
+    <svg class="bot" id="bot" viewBox="0 0 240 240" role="img" aria-label="세우봇 진행자">
+      <defs><linearGradient id="hg" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#2b5a8a"/><stop offset="1" stop-color="#123459"/></linearGradient>
+      <linearGradient id="vg" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#06121f"/><stop offset="1" stop-color="#0d2238"/></linearGradient></defs>
+      <ellipse cx="120" cy="226" rx="70" ry="8" fill="#000" opacity=".25"/>
+      <path d="M60 230c4-34 26-50 60-50s56 16 60 50z" fill="url(#hg)"/>
+      <rect x="98" y="196" width="44" height="18" rx="5" fill="#E4761B"/><text x="120" y="209" text-anchor="middle" font-size="10" font-weight="700" fill="#fff" font-family="sans-serif">SEWOO</text>
+      <line x1="120" y1="40" x2="120" y2="20" stroke="#8fb0d1" stroke-width="4"/>
+      <circle class="ant" cx="120" cy="16" r="8" fill="#E4761B"/>
+      <circle cx="40" cy="108" r="16" fill="#E4761B"/><circle cx="200" cy="108" r="16" fill="#E4761B"/>
+      <rect x="44" y="38" width="152" height="146" rx="62" fill="url(#hg)"/>
+      <path d="M70 60c20-14 80-14 100 0" stroke="#fff" stroke-opacity=".25" stroke-width="5" fill="none" stroke-linecap="round"/>
+      <rect x="62" y="70" width="116" height="90" rx="38" fill="url(#vg)"/>
+      <rect class="eye" x="86" y="88" width="20" height="26" rx="10" fill="#7fe3ff"/>
+      <rect class="eye" x="134" y="88" width="20" height="26" rx="10" fill="#7fe3ff"/>
+      <g id="mouth" fill="#E4761B">
+        <rect class="bar" x="96" y="124" width="7" height="22" rx="3.5"/><rect class="bar" x="106" y="124" width="7" height="22" rx="3.5"/>
+        <rect class="bar" x="116" y="124" width="7" height="22" rx="3.5"/><rect class="bar" x="126" y="124" width="7" height="22" rx="3.5"/>
+        <rect class="bar" x="136" y="124" width="7" height="22" rx="3.5"/>
+      </g>
+    </svg>
+    <div>
+      <div class="cap" aria-live="polite"><div class="sec" id="capSec">대기 중</div><div class="line" id="capLine">▶ 듣기를 누르면 시작합니다.</div></div>
+      <div class="ctl">
+        <button class="main" id="play">▶ 듣기</button>
+        <button id="stop">■ 정지</button>
+        <button id="share">🔗 카톡 공유용 링크 복사</button>
+        <label class="rate">속도 <input type="range" id="rate" min="0.8" max="1.4" step="0.05" value="1.05"><span id="rv">1.05</span></label>
+        <select id="voice" aria-label="목소리 선택"></select>
+      </div>
+      <div class="prog"><i id="bar"></i></div>
+      <p class="note" id="kakao" hidden style="color:#ffd2ad">카카오톡 안에서 열면 음성이 안 나올 수 있습니다. 오른쪽 위 ⋮ → <b>다른 브라우저로 열기</b>를 눌러 주세요.</p>
+      <p class="note" id="vnote">Edge로 열면 더 자연스러운 한국어 음성(SunHi·InJoon Online)이 나옵니다. 휴대폰은 소리를 켜 주세요.</p>
+    </div>
+  </div>
+</div></header>
+
+<main class="band"><div class="wrap">
+  <p class="flow" id="flow"></p>
+  <p class="meta" id="meta"></p>
+  <div class="grid" id="grid"></div>
+  <details>
+    <summary>데이터 교체 (수집기·Ollama 요약 JSON 붙여넣기)</summary>
+    <p style="font-size:14px;color:var(--mut)">아래 형식 그대로 매일 아침 생성해 넣으면 됩니다. 페이지 안의 <code>&lt;script id="data"&gt;</code> 블록을 교체해도 동일합니다.</p>
+    <textarea id="json" spellcheck="false"></textarea>
+    <div class="row"><button id="apply">적용</button><button id="reset">원래 시안으로</button><span id="err" style="color:#c0392b;font-size:14px"></span></div>
+  </details>
+</div></main>
+
+<script id="data" type="application/json">
+{
+ "host": "세우봇",
+ "date": "2026-11-23",
+ "basis": "11월 23일 오전 공개 기사 기준 자동 요약입니다. 원문 링크로 확인해 주세요. 주식 내용은 정보 제공용이며 투자 권유가 아닙니다.",
+ "flow": "수능을 마친 고3 학생을 위한 지원 프로그램이 마련되고, 한투운용이 AI 투자 TDF를 출시했다. 코스피는 23일 5%대 급락하며 4,600선을跌破했고, 국고채 3년물 금리는 연 3.621%를 기록했다. KAI는 DGIST와 UNIST와 협약을 체결하고, 경남과 함께 우주항공 및 방산 분야에 1.5조 원을 투자하기로 했다. 보잉은 한국항공대와 협력해 강의실을 개설했고, Qantas는 보잉 737-800 대신 Airbus A321XLR을 도입할 계획이다.",
+ "sections": [
+  {
+   "title": "오늘의 핫이슈",
+   "summary": "수능을 마친 고3 학생들을 위한 지원 프로그램이 마련됐고, 한투운용이 AI에 투자하는 신개념 TDF를 출시했다. 또한, 대구시는 수험생을 위한 다양한 무료 이벤트를 진행하고 있다.",
+   "items": [
+    {
+     "t": "'근로계약서 작성·전세사기 예방법'…수능 마친 고3 지원",
+     "d": "11-23",
+     "u": "https://www.yna.co.kr/view/AKR20261123112300061"
+    },
+    {
+     "t": "\"퇴직연금도 AI에 투자한다\"…한투운용, 신개념 TDF 출시",
+     "d": "11-23",
+     "u": "https://www.hankyung.com/article/202611234364i"
+    },
+    {
+     "t": "대구시 \"수험표 있으면 음악회·프로농구·시티투어 '공짜'\"",
+     "d": "11-23",
+     "u": "https://www.yna.co.kr/view/AKR20261123112400053"
+    }
+   ]
+  },
+  {
+   "title": "증시·관련주",
+   "summary": "코스피는 23일 장중 5%대 급락하며 4,600선도 내줬고, 매도 사이드카가 발동됐다. 국고채 금리는 코스피 급락으로 인해 하락했으며, 3년물은 장중 연 3.621%를 기록했다. 한편, 제주관광공사는 세계 마이스(MICE) 시장 공략을 본격화하며 단독 홍보관을 선보였다.",
+   "items": [
+    {
+     "t": "코스피 5%대 급락, 4,600선도 내줘…매도 사이드카",
+     "d": "11-23",
+     "u": "https://www.yna.co.kr/view/AKR20261123085400008"
+    },
+    {
+     "t": "국고채 금리, 위험회피 속 하락세…3년물 장중 연 3.621%",
+     "d": "11-23",
+     "u": "https://www.yna.co.kr/view/AKR20261123085000008"
+    },
+    {
+     "t": "제주관광공사, 세계 마이스(MICE) 시장 공략 본격화",
+     "d": "11-23",
+     "u": "https://www.yna.co.kr/view/AKR20261123095800056"
+    }
+   ]
+  },
+  {
+   "title": "KAI·항공",
+   "summary": "KAI는 DGIST와 UNIST와 항공우주 인재 양성 협약을 체결하고, 경남과 함께 우주항공 및 방산 분야에 1.5조 원을 투자하는 협약을 맺었다. KAI는 사천에 5년간 1조5000억 원을 투자해 우주항공산업을 육성할 계획이다.",
+   "items": [
+    {
+     "t": "[초점] KAI 1.5조 투자에 8200억 금융…경남, 우주항공·방산 ‘수출 공급망 거점’ 키운다 - 에너지데일리",
+     "d": "11-23",
+     "u": "https://news.google.com/rss/articles/CBMickFVX3lxTE1SR2NLRWZUMWo1TmJUWmdxTXRydDFuQzNoeWtxQUg1T2FNNzhWQ1haYXpLQ2dFeTl3V2pEMlJxQmZTLTllTlBfZkVpT0RJZU16akwyY0lfQVRaS2t2NG9kd25QQTNVUEpDT01kTGo5M1k5dw?oc=5"
+    },
+    {
+     "t": "KAI, 사천에 5년간 1조5000억원 투자…우주항공산업 육성 - 브레이크뉴스",
+     "d": "11-23",
+     "u": "https://news.google.com/rss/articles/CBMiR0FVX3lxTE5GRnJYYWRLeVowMENzU2pDeWtweGt4OTFfdDhzYzlndU5RUzFjWXRBc3ZlQnRpanhET0xsVUYyN1dOR0dfQzlv?oc=5"
+    },
+    {
+     "t": "산업부·경남·KAI, 우주항공 및 방산에 1.5조 투자협약 체결 - 서울파이낸스",
+     "d": "11-23",
+     "u": "https://news.google.com/rss/articles/CBMiakFVX3lxTE41WUZObC1sbGd6OE41Zl82SDlyTjByXzFOY0o2N1ZtUk9xU2MtcnNzM3FlSjNFTTgxZDdwaW1Dc1BWVG41N3NVTFcxWW1Henh2U21fV2V4c0dIZG5XRUFrRlY1S0E5OHVpVFE?oc=5"
+    }
+   ]
+  },
+  {
+   "title": "글로벌 OEM·공급망",
+   "summary": "한국항공대는 보잉과 협력해 ‘보잉 혁신 강의실’을 명명하고 ‘2026 보잉데이’를 개최했다. BYD 덴자 B5는 180톤의 보잉747을 성공적으로 견인했지만, 중국에서는 서스펜션 파손 의혹이 제기되고 있다. Qantas는 보잉 737-800을 대체하기 위해 Airbus A321XLR을 도입할 계획이라고 보도되었다.",
+   "items": [
+    {
+     "t": "한국항공대, ‘보잉 혁신 강의실’ 명명과 `2026 보잉데이’ 개최 - 국토매일",
+     "d": "11-23",
+     "u": "https://news.google.com/rss/articles/CBMiREFVX3lxTE5aVzZRbmNqSHRFeTdpSktNZmRXS05ZaF90TWM4bVlUa1ZNWE1yOEhUcExRMmpXeGxhTnRGcWxLRHg0ekZE?oc=5"
+    },
+    {
+     "t": "BYD 덴자 B5, 180톤 보잉747 견인 성공 화제..중국서는 서스펜션 파손 의혹 - 카가이",
+     "d": "11-23",
+     "u": "https://news.google.com/rss/articles/CBMiZkFVX3lxTFB3TGVYRzE5ZDFaVzhzSkl1U28ybkFHVUpCTGFtT3NjVGRPenZOVnZNdmk4N0hxMDJfcl9qVEg4eXBjSk5ib0dCYmhTRExFZEllV2g5Qk9UNVFLTTk2MHJGVDlHSjgzUQ?oc=5"
+    },
+    {
+     "t": "Is Qantas Really Replacing Its Boeing 737-800s With Airbus A321XLRs Built For Longer Routes?",
+     "d": "11-23",
+     "u": "https://simpleflying.com/qantas-replacing-boeing-737-800s-airbus-a321xlrs-longer-routes/"
+    }
+   ]
+  },
+  {
+   "title": "방산",
+   "summary": "정부와 KAI는 우주항공 및 방산 분야에 1.5조 원을 투자하고, 8200억 원의 금융 지원을 약속했다. 경남은 이 투자로 인해 우주항공과 방산 수출의 거점으로 성장할 것으로 기대된다. K방산은 유럽 현지 생산 확대에도 불구하고 수주가 감소하며 수출 전략에 대한 시험대에 오르게 됐다.",
+   "items": [
+    {
+     "t": "[초점] KAI 1.5조 투자에 8200억 금융…경남, 우주항공·방산 ‘수출 공급망 거점’ 키운다 - 에너지데일리",
+     "d": "11-23",
+     "u": "https://news.google.com/rss/articles/CBMickFVX3lxTE1SR2NLRWZUMWo1TmJUWmdxTXRydDFuQzNoeWtxQUg1T2FNNzhWQ1haYXpLQ2dFeTl3V2pEMlJxQmZTLTllTlBfZkVpT0RJZU16akwyY0lfQVRaS2t2NG9kd25QQTNVUEpDT01kTGo5M1k5dw?oc=5"
+    },
+    {
+     "t": "1조5000억원 투자·8200억원 상생금융으로 우주항공·방산 동남권 지역거점 육성 - 데일리안",
+     "d": "11-23",
+     "u": "https://news.google.com/rss/articles/CBMi2AFBVV95cUxOUm1fRXJUZWVudUtWY1VTLVA3dW9teWZlSXQ2UFVVWnVoQkVxM3lYZVlwdXZkT0ZzeFpNc0o5SGYwa0l1RXM0UDNIZzU1S0dEQldlOURnNlNONXdwMmlDR2FGTXc2UU9ZUTM4UEVtYkxJNXJxeUNKUEpQdkMtUWh6R1pzX3J6YXFSQmtiWWlBVE94RGZFcTc5VFpOMXNMc0p2TjZSd3ZaZXNGYzJrZmpSS2szbXhobUxobUpBaW1hUnlzX1BhdGkybHhIN3E1NXV0UW51R0FZM0k?oc=5"
+    },
+    {
+     "t": "K방산, 유럽 현지 생산 확대에도 수주 감소…수출 전략 시험대 - 아시아타임즈",
+     "d": "11-23",
+     "u": "https://news.google.com/rss/articles/CBMiXkFVX3lxTE1JYm1OQlpiSHZXWnNIWDdHajZ3SnItQzVzd2dUSEU2Ulptc2QzV3J0cDBPZDI2Y3JycUdVa2N3dzZRQ0EzSTZ0c2pIQmhVbk95THJrWUNYajhlRV95eHc?oc=5"
+    }
+   ]
+  }
+ ]
+}
+</script>
+<script>
+{
+const $=id=>document.getElementById(id);
+const ORIG=$('data').textContent;
+let D=JSON.parse(ORIG), Q=[], qi=0, state='idle', voices=[];
+const synth=window.speechSynthesis;
+const esc=s=>String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const split=t=>(t.match(/[^.!?]+[.!?]?/g)||[]).map(s=>s.trim()).filter(Boolean);
+
+function render(){
+  $('title').textContent=`말하는 ${D.host} — 아침 뉴스 브리핑`;
+  const [y,m,d]=D.date.split('-');
+  $('sub').innerHTML=`듣기를 누르면 ${esc(D.host)}가 오늘의 흐름과 섹터 요약을 읽어 드립니다. <b>${+m}월 ${+d}일</b> 브리핑입니다.`;
+  $('flow').textContent=D.flow;
+  $('meta').textContent=D.basis||'';
+  $('grid').innerHTML=D.sections.map((s,i)=>`<article class="card" id="c${i}">
+    <h2><span>${esc(s.title)}${s.tag?`<span class="tag">${esc(s.tag)}</span>`:''}</span><button data-i="${i}" aria-label="${esc(s.title)} 듣기">▶ 이것만</button></h2>
+    <p>${esc(s.summary)}</p>
+    <ul>${(s.items||[]).map(x=>`<li><a href="${esc(x.u)}" target="_blank" rel="noopener">${esc(x.t)}</a> <span class="d">${esc(x.d)}</span></li>`).join('')}</ul></article>`).join('');
+  $('json').value=JSON.stringify(D,null,1);
+}
+function build(from=-1,only=false){
+  Q=[];
+  if(from<0){Q.push({sec:-1,label:'오늘의 흐름',text:`안녕하세요, ${D.host}입니다. ${+D.date.split('-')[1]}월 ${+D.date.split('-')[2]}일 아침 브리핑을 시작합니다.`});
+    split(D.flow).forEach(t=>Q.push({sec:-1,label:'오늘의 흐름',text:t}));}
+  D.sections.forEach((s,i)=>{
+    if(from>=0&&(only?i!==from:i<from))return;
+    Q.push({sec:i,label:s.title,text:`${s.title}${s.tag==='가설'?', 가설 단계입니다':''}.`});
+    split(s.summary).forEach(t=>Q.push({sec:i,label:s.title,text:t}));
+  });
+  if(!only)Q.push({sec:-1,label:'마무리',text:'이상 오늘의 브리핑이었습니다. 좋은 하루 보내세요.'});
+  qi=0;
+}
+function pickVoices(){
+  voices=synth.getVoices().filter(v=>/^ko/i.test(v.lang));
+  const score=v=>(/Natural|Online/i.test(v.name)?3:0)+(/SunHi|InJoon|Google/i.test(v.name)?1:0);
+  voices.sort((a,b)=>score(b)-score(a));
+  $('voice').innerHTML=voices.length?voices.map((v,i)=>`<option value="${i}">${esc(v.name.replace(/Microsoft |Online \(Natural\) - /g,''))}</option>`).join(''):'<option>한국어 음성 없음</option>';
+  if(!voices.length)$('vnote').textContent='이 브라우저에 한국어 음성이 없습니다. Edge 또는 Chrome에서 열어 주세요.';
+}
+function talk(on){$('bot').classList.toggle('talking',on)}
+function mark(i){document.querySelectorAll('.card').forEach((c,k)=>c.classList.toggle('now',k===i));if(i>=0)$('c'+i).scrollIntoView({block:'nearest',behavior:'smooth'})}
+function next(){
+  if(state!=='play')return;
+  if(qi>=Q.length){finish();return}
+  const it=Q[qi];
+  $('capSec').textContent=it.label;$('capLine').textContent=it.text;mark(it.sec);
+  $('bar').style.width=(qi/Q.length*100)+'%';
+  const u=new SpeechSynthesisUtterance(it.text);
+  u.lang='ko-KR';u.rate=+$('rate').value;const v=voices[+$('voice').value];if(v)u.voice=v;
+  u.onstart=()=>talk(true);
+  u.onend=()=>{talk(false);qi++;setTimeout(next,180)};
+  u.onerror=e=>{talk(false);if(e.error!=='interrupted'&&e.error!=='canceled'){qi++;next()}};
+  synth.speak(u);
+}
+function finish(){state='idle';talk(false);mark(-2);$('bar').style.width='100%';$('play').textContent='▶ 다시 듣기';$('capSec').textContent='완료';$('capLine').textContent='브리핑을 마쳤습니다.'}
+function start(from,only){synth.cancel();build(from,only);state='play';$('play').textContent='⏸ 잠시 멈춤';next()}
+$('play').onclick=()=>{
+  if(!synth){$('capLine').textContent='이 브라우저는 음성 읽기를 지원하지 않습니다.';return}
+  if(state==='idle')start(-1);
+  else if(state==='play'){synth.pause();state='pause';talk(false);$('play').textContent='▶ 계속'}
+  else{synth.resume();state='play';talk(true);$('play').textContent='⏸ 잠시 멈춤'}
+};
+$('stop').onclick=()=>{state='idle';synth.cancel();talk(false);mark(-2);$('play').textContent='▶ 듣기';$('capSec').textContent='정지';$('capLine').textContent='▶ 듣기를 누르면 처음부터 시작합니다.';$('bar').style.width='0'};
+$('grid').onclick=e=>{const b=e.target.closest('button[data-i]');if(b)start(+b.dataset.i,true)};
+$('rate').oninput=e=>$('rv').textContent=(+e.target.value).toFixed(2);
+$('apply').onclick=()=>{try{const n=JSON.parse($('json').value);if(!n.sections||!n.flow)throw Error('flow·sections 항목이 필요합니다');D=n;$('stop').click();render();$('err').textContent='적용됨'}catch(x){$('err').textContent='JSON 오류: '+x.message}};
+$('reset').onclick=()=>{D=JSON.parse(ORIG);$('stop').click();render();$('err').textContent=''};
+$('share').onclick=async()=>{const url='https://lvews1-svg.github.io/sewoo/';try{await navigator.clipboard.writeText(`[${D.host} 아침 브리핑 ${D.date}]\n▶ 눌러서 듣기: ${url}`);$('share').textContent='✔ 복사됨 — 카톡에 붙여넣기'}catch(e){$('share').textContent='복사 실패 — 공유 버튼의 링크 사용'}setTimeout(()=>$('share').textContent='🔗 카톡 공유용 링크 복사',2500)};
+if(/KAKAOTALK/i.test(navigator.userAgent))$('kakao').hidden=false;
+render();
+if(synth){pickVoices();synth.onvoiceschanged=pickVoices}
+}
+</script>
+</body>
+</html>
